@@ -1,2 +1,5 @@
 /notebooks/ej2/logs
 /notebooks/src/__pycache__
+/notebooks/src/ipynb_checkpoints
+.ipynb_checkpoints
+__pycache__
