@@ -1,5 +1,9 @@
-/notebooks/ej2/logs
-/notebooks/src/__pycache__
-/notebooks/src/ipynb_checkpoints
+/notebooks/ej2/tb-logs/mlp
+/notebooks/ej2/tb-logs/
+/notebooks/ej2/logs/
+/notebooks/ej2/checkpoints/
+/notebooks/ej2/checkpoints/mlp/
+/src/__pycache__
+/src/ipynb_checkpoints
 .ipynb_checkpoints
 __pycache__

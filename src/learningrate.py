@@ -17,17 +17,19 @@ class StepDecay:
         self.drop = drop
         self.epochs_drop = epochs_drop
     
-    def __call__(self, epoch, lr):
+    def __call__(self, epoch):
         return self.lr0 * self.drop ** np.floor(epoch / float(self.epochs_drop))
-    
+
+
 class ExponentialDecay:
     """ Computes the exponential decay for the dynamic learning rate evolution
         throughout the training process.
     """
 
-    def __init__(self, lr0: float, k: float):
+    def __init__(self, lr0: float, decay_rate: float, decay_steps : int = 1):
         self.lr0 = lr0
-        self.k = k
+        self.decay_rate = decay_rate
+        self.decay_steps = decay_steps
 
-    def __call__(self, epoch, lr):
-        return self.lr0 * np.exp(-self.k * epoch)
+    def __call__(self, epoch):
+        return self.lr0 * np.exp(-self.decay_rate * np.floor(epoch / self.decay_steps))
