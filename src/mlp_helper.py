@@ -137,6 +137,9 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               optimizer='sgd',
               patience=50,
               min_delta=10,
+              summary_on=True,
+              tensorboard_on=True,
+              checkpoints_on=True,
               **kwargs):
     """ Creates the neural network with the given hyperparameters, compiles the model using the corresponding optimizer, loss function, 
         metrics and other hyperparameters. Train, validate and test a model built with the given settings.
@@ -154,36 +157,40 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param optimizer                 Optimizer
         @param patience                  Patience used for early stopping, amount of epochs without improvements allowed
         @param min_delta                 Minimum delta accounted as an improvement in the loss function during training
+        @param tensorboard_on            Enables whether to log or not onto TensorBoard
+        @param checkpoints_on            Enables whether to save model checkpoints or not
+        @param summary_on                Enables whether to print a summary of the model and its results
         
         - If optimizer is 'sgd', should set the following parameters or a default value will used
-            @param momentum      Factor used with the first order momentum, belongs to [0, 1]. Default is 0.0.
+        @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0.0.
         
         - If optimizer is 'rmsprop', should set the following parameters or a default value will used
-            @param momentum      Factor used with the first order momentum, belongs to [0, 1]. Default is 0.0.
-            @param rho           Factor used with the second order momentum, belongs to [0, 1]. Default is 0.0.
-        
+        @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0.0.
+        @param rho                       Factor used with the second order momentum, belongs to [0, 1]. Default is 0.0.
+
         - If optimizer is 'adam', should set the following parameters or a default value will be used
-            @param beta_1        Factor used with the first order momentum, belongs to [0, 1]. Default is 0.0.
-            @param beta_2        Factor used with the second order momentum, belongs to [0, 1]. Default is 0.0.
-        
+        @param beta_1                    Factor used with the first order momentum, belongs to [0, 1]. Default is 0.0.
+        @param beta_2                    Factor used with the second order momentum, belongs to [0, 1]. Default is 0.0.
+    
         @return Tuple containing model and its test performance => (model, metric)
     """
     # Get current timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     
     # Create the logging directory name
-    log_dir = 'tb-logs/mlp/' + timestamp
+    if tensorboard_on:
+        log_dir = 'tb-logs/mlp/' + timestamp
+        print(f'Model logs at {log_dir}')
     
     # Create the model checkpoint directory name
-    checkpoint_dir = 'checkpoints/mlp/' + timestamp
-    
-    # Print information before start creating the model and training
-    print(f'Model logs at {log_dir}')
-    print(f'Model checkpoints at {checkpoint_dir}')
+    if checkpoints_on:
+        checkpoint_dir = 'checkpoints/mlp/' + timestamp
+        print(f'Model checkpoints at {checkpoint_dir}')
     
     # Create the neural network
     model = create_model(layers_neurons, layers_activation, use_batch_normalization)
-    model.summary()
+    if summary_on:
+        model.summary()
     
     # Create the optimizer
     if optimizer == 'adam':
@@ -201,8 +208,11 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         raise ValueError('Unknown or unsupported optimizer, expected: adam, sgd or rmsprop')
     
     # Create the learning rate scheduler
-    lr_callback = keras.callbacks.LearningRateScheduler(LRTensorBoardLogger(log_dir + '/learning-rate', learningrate.ExponentialDecay(learning_rate, decay_rate)))
-    
+    if tensorboard_on:
+        lr_callback = keras.callbacks.LearningRateScheduler(LRTensorBoardLogger(log_dir + '/learning-rate', learningrate.ExponentialDecay(learning_rate, decay_rate)))
+    else:
+        lr_callback = keras.callbacks.LearningRateScheduler(learningrate.ExponentialDecay(learning_rate, decay_rate))
+        
     # Compile the neural network
     model.compile(
         optimizer=model_optimizer,
@@ -211,14 +221,16 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     )
     
     # Create the model checkpoint callback
-    mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '{epoch}.hdf5', monitor='val_loss', save_best_only=True, verbose=0)
+    if checkpoints_on:
+        mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '{epoch}.hdf5', monitor='val_loss', save_best_only=True, verbose=0)
     
     # Create the tensorboard callback
-    tb_callback = keras.callbacks.TensorBoard(log_dir=log_dir,
-                                              histogram_freq=1,
-                                              embeddings_freq=1, 
-                                              update_freq='epoch'
-                                             )
+    if tensorboard_on:
+        tb_callback = keras.callbacks.TensorBoard(log_dir=log_dir,
+                                                  histogram_freq=1,
+                                                  embeddings_freq=1, 
+                                                  update_freq='epoch'
+                                                 )
     
     # Create the early stopping callback
     es_callback = keras.callbacks.EarlyStopping(monitor='val_loss',
@@ -227,7 +239,14 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
                                                 min_delta=min_delta,
                                                 restore_best_weights=True
                                                )
-
+    
+    # Define callbacks used
+    callbacks = [ es_callback, lr_callback ]
+    if tensorboard_on:
+        callbacks += [ tb_callback ]
+    if checkpoints_on:
+        callbacks += [ mc_callback ]
+    
     # Train the neural network
     model.fit(x_train, y_train,
               validation_data=(x_valid, y_valid),
@@ -235,15 +254,17 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               verbose=0, 
               shuffle=True, 
               batch_size=batch_size,
-              callbacks=[ tb_callback, es_callback, lr_callback, mc_callback ],
+              callbacks=callbacks,
               use_multiprocessing=True
              )
     
     # Log results
-    tensorboard_log(log_dir + '/testing', 'charges', y_test.to_numpy())
-    tensorboard_log(log_dir + '/predicted', 'charges', model.predict(x_test).reshape(-1))
+    if tensorboard_on:
+        tensorboard_log(log_dir + '/testing', 'charges', y_test.to_numpy())
+        tensorboard_log(log_dir + '/predicted', 'charges', model.predict(x_test).reshape(-1))
     
     # Return the trained model
-    mae, _ = model.evaluate(x_test, y_test, callbacks=[ tb_callback ], verbose=0)
-    print(f'Mean absolute error of the test set {mae}')
-    return (model, mae)
+    mae, _ = model.evaluate(x_test, y_test, verbose=0)
+    if summary_on:
+        print(f'Mean absolute error of the test set {mae}')
+    return mae
