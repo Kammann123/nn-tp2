@@ -1,88 +1,58 @@
 """
-    @file helper.py
+    @file   helper.py
+    @desc   Contains general functions and classes
     @author Joaquin Oscar Gaytan and Lucas Agustin Kammann
 """
 
 # Third-party modules of Python
-import matplotlib.pyplot as plt
-import numpy as np
+import tensorflow.keras as keras
+import tensorflow as tf
+import datetime
 
 
-def mean_absolute_error(true_results, predicted_results):
-    """ Compute absolute and mean absolute error for each result comparing the predicted value
-        with the true value throughout the dataset.
-        @param true_results Array or list with the true annotated results
-        @param predicted_results Array or list with the predicted results
-        @return Tuple containing evolution of error throughout the dataset 
-                => (absolute error, mean absolute error)
-    """
-    # Compute the error
-    error = true_results - predicted_results
-    # Compute the absolute error
-    absolute_error = np.abs(error)
-    # Compute the accumulative the error
-    accumulative_error = np.cumsum(absolute_error)
-    # Compute the mean absolute error through the samples
-    mean_absolute_error = accumulative_error / np.array(range(1, 1 + len(accumulative_error)))
-    return (absolute_error, mean_absolute_error)
-
-def plot_linear_regression_history(history):
-    """ Plots the history obtained from the training and validation process using the Keras algorithms.
-        @param history History containing loss, validation loss and learning rate
-    """
-    # Create the layout and plots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 15))
-
-    # Retrieve the fields, if existing
-    loss = history.history['loss']
-    val_loss = history.history['loss']
-    lr = history.history['lr']
-
-    # Create the loss plot
-    ax1.plot(loss, label='Training Loss')
-    ax1.plot(val_loss, label='Validation Loss')
-    ax1.set_ylabel('Loss', fontsize=15)
-    ax1.set_xlabel('n', fontsize=15)
-    ax1.legend(fontsize=15)
-    ax1.grid()
-
-    # Create the learning rate plot
-    ax2.plot(lr)
-    ax2.set_ylabel('Learning Rate', fontsize=15)
-    ax2.set_xlabel('n', fontsize=15)
-    ax2.grid()
-
-    # Show the plots
-    plt.show()
-    
-def plot_linear_regression_result(true_results, predicted_results, result_label=''):
-    """ Plots the real or true results for each case in the dataset and compares it with the 
-        predicted result. It also plots the error for each case and the accumulative mean or 
-        absolute error. 
-        @param true_results Array or list with the true annotated results
-        @param predicted_results Array or list with the predicted results
-        @param result_label String label for the output of the linear regression
+class LRTensorBoardLogger:
+    """ Callable instance used to wrap a learning rate scheduler and log learning rate values 
+        throughout the training process onto the TensorBoard platform.
     """
     
-    # Compute the errors
-    abs_error, mean_abs_error = mean_absolute_error(true_results, predicted_results)
+    def __init__(self, log_dir, schedule):
+        """ Create a learning rate schedule that logs data onto TensorBoard.
+            @param log_dir Logging directory for TensorBoard files
+            @param schedule Function used to define the scheduling pattern for dynamic learning rate
+        """
+        
+        # Save parameters as internal members
+        self.log_dir = log_dir
+        self.schedule = schedule
+        
+        # Create a file writer for TensorBoard logs
+        self.file_writer = tf.summary.create_file_writer(log_dir)
+        self.file_writer.set_as_default()
     
-    # Create plots and layout
-    fig, ax = plt.subplots(2, 1, figsize=(18, 12))
+    def __call__(self, epoch):
+        """ Compute the learning rate and logs it onto TensorBoard.
+            @param epoch Current training epoch
+            @return lr Learning rate
+        """
+        # Compute the new dynamic learning rate, log in onto TensorBoard and
+        # return the result for the training process
+        learning_rate = self.schedule(epoch)
+        tf.summary.scalar('learning rate', data=learning_rate, step=epoch)
+        return learning_rate
 
-    # Plot the real and the prediction
-    ax[0].plot(true_results, marker='o', label='Real')
-    ax[0].plot(predicted_results, marker='o', label='Predicción')
-    ax[0].set_xlabel('$n$', fontsize=15)
-    ax[0].set_ylabel(result_label, fontsize=15)
-    ax[0].legend(fontsize=12)
-    ax[0].grid()
 
-    # Plot the absolute error and the evolution of the mean absolute error throughout the dataset
-    ax[1].plot(abs_error, label='Error absoluto')
-    ax[1].plot(mean_abs_error, label='Error absolute medio')
-    ax[1].legend(fontsize=12)
-    ax[1].grid()
+def tensorboard_log(log_dir, tag, data):
+    """ Log a scalar, a set of data or a time series in TensorBoard, by creating the proper log file
+        in the logging directory, using the given tag and data.
+        @param log_dir Logging directory where the TensorBoard file is created
+        @param tag Tag used to group type of data or plots
+        @param data Data to plot
+    """
+    # Create a file writer for TensorBoard logs
+    file_writer = tf.summary.create_file_writer(log_dir)
+    file_writer.set_as_default()
 
-    # Show the graph
-    plt.show()
+    # Send to TensorBoard both results
+    for i in range(len(data)):
+        tf.summary.scalar(tag, data=data[i], step=i)
+        file_writer.flush()
