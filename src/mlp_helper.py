@@ -98,6 +98,7 @@ def create_model(layers_neurons=[],
     embedding = keras.layers.Embedding(4, 2, input_length=1, embeddings_initializer='normal')(x2)
     flatten = keras.layers.Flatten()(embedding)
     x = keras.layers.Concatenate()([x1, flatten])
+    current_layer = x
 
     # Add the hidden layers to the neural network
     layers = []
