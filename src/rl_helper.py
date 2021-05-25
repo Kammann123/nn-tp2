@@ -104,11 +104,16 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     # Create the polynomial features preprocessor
     poly = preprocessing.PolynomialFeatures(degree=degree, include_bias=False)
     poly.fit(x_train)
-    
-    # Apply the feature engineering to create more features using the polynomial preprocessor
     x_train = poly.transform(x_train)
     x_valid = poly.transform(x_valid)
     x_test = poly.transform(x_test)
+    
+    # Normalize the variables
+    scaler = preprocessing.StandardScaler()
+    scaler.fit(x_train)
+    x_train = scaler.transform(x_train)
+    x_valid = scaler.transform(x_valid)
+    x_test = scaler.transform(x_test)
         
     # Create the model
     model = create_model(input_shape=poly.n_output_features_, *args, **kwargs)
@@ -183,19 +188,24 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               shuffle=True, 
               batch_size=batch_size,
               callbacks=callbacks,
+              workers=4,
               use_multiprocessing=True
              )
     
-    # Load the best model
+    # Load the best model and evaluate the metric
     model = keras.models.load_model(checkpoint_dir + '.hdf5')
     
     # Log results
     if tensorboard_on:
-        helper.tensorboard_log(log_dir + '/testing', 'charges', y_test.to_numpy())
-        helper.tensorboard_log(log_dir + '/predicted', 'charges', model.predict(x_test).reshape(-1))
-    
-    # Compute the test set metric
-    mae, _ = model.evaluate(x_test, y_test, verbose=0)
+        helper.tensorboard_log(log_dir + '/train/true', 'charges', y_train.to_numpy())
+        helper.tensorboard_log(log_dir + '/train/predicted', 'charges', model.predict(x_train).reshape(-1))
+        helper.tensorboard_log(log_dir + '/test/true', 'charges', y_test.to_numpy())
+        helper.tensorboard_log(log_dir + '/test/predicted', 'charges', model.predict(x_test).reshape(-1))
+        
+    # Copute the test set metric
+    mae_train, _ = model.evaluate(x_train, y_train, verbose=0)
+    mae_valid, _ = model.evaluate(x_valid, y_valid, verbose=0)
+    mae_test, _ = model.evaluate(x_test, y_test, verbose=0)
     if summary_on:
-        print(f'Mean absolute error of the test set {mae}')
-    return mae
+        print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
+    return mae_test

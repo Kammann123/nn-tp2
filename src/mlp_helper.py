@@ -19,6 +19,7 @@ def create_model(hidden_layers=0,
                  hidden_layer_activation=None,
                  regularizer=None,
                  regularizer_lambda=1e-10,
+                 dropout_rate=0.0,
                  use_batch_normalization=False
                 ):
     """ Creates a neural network model.
@@ -30,6 +31,7 @@ def create_model(hidden_layers=0,
         @param hidden_layer_activation   Activation function used in hidden layers
         @param regularizer               Type of regularizer to use, values supported are None, 'l1' or 'l2'
         @param regularizer_lambda        Regularizer coefficiente
+        @param dropout_rate              Rate of the dropout layer added after each dense layer
         @param use_batch_normalization   Determines whether to use Batch Normalization between hidden layers or not
         @return Keras neural network or model instance
     """
@@ -57,13 +59,20 @@ def create_model(hidden_layers=0,
     layers = []
     for layer_index in range(hidden_layers):
         # Create a dense layer and add it to the neural network
-        previous_layer = layers[(2 * layer_index - 1) if use_batch_normalization else (layer_index - 1)] if layer_index else x
+        layers_per_layer = 1 + (1 if dropout_rate else 0) + (1 if use_batch_normalization else 0)
+        previous_layer = layers[layers_per_layer * layer_index - 1] if layer_index else x
         current_layer = keras.layers.Dense(units=units_per_layer, 
                                            activation=hidden_layer_activation, 
                                            kernel_initializer='random_normal',
                                            kernel_regularizer=kernel_regularizer
                                           )(previous_layer)
         layers.append(current_layer)
+        
+        # Create a dropout layer aftear each dense layer
+        if dropout_rate:
+            previous_layer = current_layer
+            current_layer = keras.layers.Dropout(dropout_rate)(previous_layer)
+            layers.append(current_layer)
         
         # Create a batch normalization layer after each dense layer
         if use_batch_normalization:
@@ -84,6 +93,7 @@ def create_model(hidden_layers=0,
 
 def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               optimizer='sgd',
+              loss='mae',
               momentum=0,
               rho=0,
               beta_1=0,
@@ -106,6 +116,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param x_valid, y_valid          Valid set
         @param x_test, y_test            Test set
         @param optimizer                 Optimizer
+        @param loss                      Loss function to be used
         @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0
         @param rho                       Factor used with the second order momentum, belongs to [0, 1]. Default is 0
         @param beta_1                    Factor used with the first order momentum, belongs to [0, 1]. Default is 0
@@ -150,7 +161,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         
     # Compile the neural network
     model.compile(optimizer=model_optimizer,
-                  loss=keras.losses.MAE,
+                  loss=loss,
                   metrics=[ keras.losses.MAE ]
                  )
     
@@ -201,11 +212,15 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     
     # Log results
     if tensorboard_on:
-        helper.tensorboard_log(log_dir + '/testing', 'charges', y_test.to_numpy())
-        helper.tensorboard_log(log_dir + '/predicted', 'charges', model.predict(x_test).reshape(-1))
+        helper.tensorboard_log(log_dir + '/train/true', 'charges', y_train.to_numpy())
+        helper.tensorboard_log(log_dir + '/train/predicted', 'charges', model.predict(x_train).reshape(-1))
+        helper.tensorboard_log(log_dir + '/test/true', 'charges', y_test.to_numpy())
+        helper.tensorboard_log(log_dir + '/test/predicted', 'charges', model.predict(x_test).reshape(-1))
         
     # Copute the test set metric
-    mae, _ = model.evaluate(x_test, y_test, verbose=0)
+    mae_train, _ = model.evaluate(x_train, y_train, verbose=0)
+    mae_valid, _ = model.evaluate(x_valid, y_valid, verbose=0)
+    mae_test, _ = model.evaluate(x_test, y_test, verbose=0)
     if summary_on:
-        print(f'Mean absolute error of the test set {mae}')
-    return mae
+        print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
+    return mae_test
