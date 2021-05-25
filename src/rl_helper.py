@@ -16,16 +16,32 @@ import src.learningrate as learningrate
 import src.helper as helper
 
 
-def create_model(input_shape):
+def create_model(input_shape=1,
+                 regularizer=None,
+                 regularizer_lambda=1e-10):
     """ Creates a linear regression model using the given hyperparameters.
     
-        @param input_shape Amount of input variables of the model
+        @param input_shape               Amount of input variables of the model
+        @param regularizer               Type of regularizer to use, values supported are None, 'l1' or 'l2'
+        @param regularizer_lambda        Regularizer coefficiente
         @return Keras model instance
     """
+    # If a regularizer is set, create it before creating the model
+    if regularizer == 'l1':
+        kernel_regularizer = keras.regularizers.l1(regularizer_lambda)
+    elif regularizer == 'l2':
+        kernel_regularizer = keras.regularizers.l2(regularizer_lambda)
+    else:
+        kernel_regularizer = None
+        
     # Create the linear regression model
     model = keras.Sequential()
     model.add(keras.layers.Input(shape=(input_shape, )))
-    model.add(keras.layers.Dense(units=1, activation='linear'))
+    model.add(keras.layers.Dense(units=1, 
+                                 activation='linear', 
+                                 kernel_initializer='random_normal',
+                                 kernel_regularizer=kernel_regularizer
+                                ))
     return model
 
 
@@ -33,7 +49,14 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               learning_rate,
               degree=1,
               scheduler=None,
+              decay_rate=0.1,
+              drop_rate=0.5,
+              epochs_drop=10,
               optimizer='sgd',
+              momentum=0,
+              rho=0,
+              beta_1=0,
+              beta_2=0,
               batch_size=64,
               epochs=100,
               patience=50,
@@ -41,6 +64,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               tensorboard_on=True,
               checkpoints_on=True,
               summary_on=True,
+              *args,
               **kwargs):
     """ Creates the model using the given hyperparameters, compiles the model and run the train, 
         validation and test process.
@@ -51,6 +75,14 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param learning_rate             Learning rate
         @param degree                    Order of the polynomial features
         @param scheduler                 Type of learning rate used, can be None (constant learning rate), 'exponential-decay', 'step-decay' or 'time-decay'
+        @param decay_rate                Decaying rate of the learning rate, when using TimeBasedDecay or ExponentialDecay
+        @param drop_rate                 Drop rate of the learning rate, when using StepDecay
+        @param epochs_drop               Period of epochs for learning rate update, when using StepDecay
+        @param optimizer                 Optimizer
+        @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0
+        @param rho                       Factor used with the second order momentum, belongs to [0, 1]. Default is 0
+        @param beta_1                    Factor used with the first order momentum, belongs to [0, 1]. Default is 0
+        @param beta_2                    Factor used with the second order momentum, belongs to [0, 1]. Default is 0
         @param batch_size                Batch size
         @param epochs                    Amount of epochs
         @param patience                  Patience used for early stopping, amount of epochs without improvements allowed
@@ -58,44 +90,16 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param tensorboard_on            Enables whether to log or not onto TensorBoard
         @param checkpoints_on            Enables whether to save model checkpoints or not
         @param summary_on                Enables whether to print a summary of the model and its results
-
-        [ scheduler options ]
-        - If scheduler is 'exponential-decay', should set the following parameters or a default value will be used
-        @param decay_rate                Decaying rate of the ExponentialDecay scheduler. Default is 0.1
-        
-        - If scheduler is 'time-decay', should set the following parameters or a default value will be used
-        @param decay_rate                Decaying rate of the TimeBasedDecay scheduler. Default is 0.1
-        
-        - If scheduler is 'step-decay', should set the following parameters or a default value will be used
-        @param epochs_drop               Decaying rate of the StepDecay scheduler. Default is 0.1
-        @param drop_rate                 Dropping rate of the StepDecay scheduler. Default is 0.5
-        
-        [ optimizer options ]
-        - If optimizer is 'sgd', should set the following parameters or a default value will be used
-        @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0
-        
-        - If optimizer is 'rmsprop', should set the following parameters or a default value will be used
-        @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0
-        @param rho                       Factor used with the second order momentum, belongs to [0, 1]. Default is 0
-
-        - If optimizer is 'adam', should set the following parameters or a default value will be used
-        @param beta_1                    Factor used with the first order momentum, belongs to [0, 1]. Default is 0
-        @param beta_2                    Factor used with the second order momentum, belongs to [0, 1]. Default is 0
-        
         @return Mean absolute error in the given test set
     """
     # Get current timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     
     # Create the logging directory name
-    if tensorboard_on:
-        log_dir = 'tb-logs/rl/' + timestamp
-        print(f'Model logs at {log_dir}')
+    log_dir = 'tb-logs/rl/' + timestamp
     
     # Create the model checkpoint directory name
-    if checkpoints_on:
-        checkpoint_dir = 'checkpoints/rl/' + timestamp
-        print(f'Model checkpoints at {checkpoint_dir}')
+    checkpoint_dir = 'checkpoints/rl/' + timestamp
     
     # Create the polynomial features preprocessor
     poly = preprocessing.PolynomialFeatures(degree=degree, include_bias=False)
@@ -107,21 +111,19 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     x_test = poly.transform(x_test)
         
     # Create the model
-    model = create_model(poly.n_output_features_)
+    model = create_model(input_shape=poly.n_output_features_, *args, **kwargs)
     if summary_on:
+        if tensorboard_on:
+            print(f'Model logs at {log_dir}')
+        print(f'Model checkpoints at {checkpoint_dir}')
         model.summary()
     
     # Create the optimizer
     if optimizer == 'adam':
-        beta_1 = kwargs['beta_1'] if 'beta_1' in kwargs.keys() else 0.0
-        beta_2 = kwargs['beta_2'] if 'beta_2' in kwargs.keys() else 0.0
         model_optimizer = keras.optimizers.Adam(beta_1=beta_1, beta_2=beta_2)
     elif optimizer == 'sgd':
-        momentum = kwargs['momentum'] if 'momentum' in kwargs.keys() else 0.0
         model_optimizer = keras.optimizers.SGD(momentum=momentum)
     elif optimizer == 'rmsprop':
-        momentum = kwargs['momentum'] if 'momentum' in kwargs.keys() else 0.0
-        rho = kwargs['rho'] if 'rho' in kwargs.keys() else 0.0
         model_optimizer = keras.optimizers.RMSprop(momentum=momentum, rho=rho)
     else:
         raise ValueError('Unknown or unsupported optimizer, expected: adam, sgd or rmsprop')
@@ -134,14 +136,10 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     
     # Create the learning rate scheduler and callback
     if scheduler == 'exponential-decay':
-        decay_rate = kwargs['decay_rate'] if 'decay_rate' in kwargs.keys() else 0.1
         lr_scheduler = learningrate.ExponentialDecay(learning_rate, decay_rate)
     elif scheduler == 'time-decay':
-        decay_rate = kwargs['decay_rate'] if 'decay_rate' in kwargs.keys() else 0.1
         lr_scheduler = learningrate.TimeBasedDecay(learning_rate, decay_rate)
     elif scheduler == 'step-decay':
-        epochs_drop = kwargs['epochs_drop'] if 'epochs_drop' in kwargs.keys() else 0.1
-        drop_rate = kwargs['drop_rate'] if 'drop_rate' in kwargs.keys() else 0.5
         lr_scheduler = learningrate.StepDecay(learning_rate, drop_rate, epochs_drop)
     else:
         lr_scheduler = lambda epoch: learning_rate
