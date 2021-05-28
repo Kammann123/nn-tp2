@@ -188,7 +188,6 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               shuffle=True, 
               batch_size=batch_size,
               callbacks=callbacks,
-              workers=4,
               use_multiprocessing=True
              )
     
@@ -197,7 +196,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     
     # Log results
     if tensorboard_on:
-        helper.tensorboard_log(log_dir + '/train/true', 'charges', y_train.to_numpy())
+        helper.tensorboard_log(log_dir + '/train/true', 'charges', y_train.to_numpy().reshape(-1))
         helper.tensorboard_log(log_dir + '/train/predicted', 'charges', model.predict(x_train).reshape(-1))
         helper.tensorboard_log(log_dir + '/test/true', 'charges', y_test.to_numpy())
         helper.tensorboard_log(log_dir + '/test/predicted', 'charges', model.predict(x_test).reshape(-1))
@@ -208,4 +207,4 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     mae_test, _ = model.evaluate(x_test, y_test, verbose=0)
     if summary_on:
         print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
-    return mae_test
+    return mae_train, mae_valid, mae_test

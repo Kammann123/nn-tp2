@@ -223,4 +223,4 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     mae_test, _ = model.evaluate(x_test, y_test, verbose=0)
     if summary_on:
         print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
-    return mae_test
+    return mae_train, mae_valid, mae_test
