@@ -10,26 +10,30 @@ import tensorflow.keras as keras
 import tensorflow as tf
 import numpy as np
 import datetime
+from sklearn.metrics import confusion_matrix, fbeta_score, roc_auc_score
+import matplotlib.pyplot as plt
 
 # Project modules of Python
 import src.learningrate as learningrate
 import src.helper as helper
 
-def create_model(l1=0, l2=0, dropout=0):
+    
+
+def create_model(input_shape=8, l1=0, l2=0, dropout=0):
     
     # Define regularizer
     if l1 != 0 and l2 != 0:
         kernel_regularizer = keras.regularizers.l1_l2(l1=l1, l2=l2)
-    else if l1 != 0:
+    elif l1 != 0:
         kernel_regularizer = keras.regularizers.l1(l1)
-    else if l2 != 0:
+    elif l2 != 0:
         kernel_regularizer = keras.regularizers.l2(l2)
     else:
         kernel_regularizer = None
         
     # Define model
     model = keras.Sequential()
-    model.add(keras.layers.Dense(1, input_shape=(8,),
+    model.add(keras.layers.Dense(1, input_shape=(input_shape,),
                                  activation='sigmoid',
                                  use_bias=True,
                                  kernel_regularizer=kernel_regularizer))
@@ -46,7 +50,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               decay_rate=0.1,
               drop_rate=0.5,
               epochs_drop=10,
-              optimizer='sgd'
+              optimizer='sgd',
               momentum=0,
               rho=0,
               beta_1=0,
@@ -66,7 +70,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     
     # Create the logging directory name
-    log_dir = 'tb-logs/rl/' + tag
+    log_dir = 'tb-logs/rl/' + tag + '/' + timestamp
     
     # Create the model checkpoint directory name
     checkpoint_dir = 'checkpoints/rl/' + tag + timestamp
@@ -119,14 +123,14 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     else:
         lr_scheduler = lambda epoch: learning_rate
         
-    if tensorboard_on:
+    #if tensorboard_on:
         #lr_scheduler = helper.LRTensorBoardLogger(log_dir + '/learning-rate', lr_scheduler)
-        print('uncomment line 123!')
+        #print('uncomment line 123!')
     
     lr_callback = keras.callbacks.LearningRateScheduler(lr_scheduler)
     
     if checkpoints_on:
-        mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', monitor='val_auc', save_best_only=True, mode='max' verbose=0)
+        mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', monitor='val_auc', save_best_only=True, mode='max', verbose=0)
         
     # Create the tensorboard callback
     if tensorboard_on:
@@ -163,12 +167,12 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     model = keras.models.load_model(checkpoint_dir + '.hdf5')
     
     # Log results
-    if tensorboard_on:
+    #if tensorboard_on:
         #helper.tensorboard_log(log_dir + '/train/true', 'charges', y_train.to_numpy().reshape(-1))
         #helper.tensorboard_log(log_dir + '/train/predicted', 'charges', model.predict(x_train).reshape(-1))
         #helper.tensorboard_log(log_dir + '/test/true', 'charges', y_test.to_numpy())
         #helper.tensorboard_log(log_dir + '/test/predicted', 'charges', model.predict(x_test).reshape(-1))
-        print('uncomment line 166!')
+        #print('uncomment line 166!')
         
     # Compute metrics
     eval_train = model.evaluate(x_train, y_train, verbose=0, return_dict=True)
@@ -179,13 +183,19 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     valid_scores = {'auc': 0}    
     test_scores = {'auc': 0}
     
+
+    auc_train = eval_train['auc']
+    auc_valid= eval_valid['auc']
+    auc_test = eval_test['auc']
+    
+    
     # Assign metrics
-    train_scores['auc'] = eval_train['auc']
-    valid_scores['auc'] = eval_valid['auc']
-    test_scores['auc'] = eval_test['auc']
+    train_scores['auc'] = auc_train
+    valid_scores['auc'] = auc_valid
+    test_scores['auc'] = auc_test
     
     if summary_on:
-        print(f'[AUC] Train: {eval_train['auc']} Valid: {eval_valid['auc']} Test: {eval_test['auc']}')
+        print(f'[AUC] Train: {auc_train:.4f} Valid: {auc_valid:.4f} Test: {auc_test:.4f}')
         
-return train_scores, valid_scores, test_scores
+    return train_scores, valid_scores, test_scores
     
