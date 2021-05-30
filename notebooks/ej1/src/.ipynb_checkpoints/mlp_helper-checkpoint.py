@@ -4,6 +4,7 @@ import datetime
 
 import src.learningrate as learningrate
 import src.helper as helper
+from src.helper import get_metrics
 
 def create_model(hidden_layers=0, units_per_layer=0, hidden_layer_activation=None, regularizer=None,regularizer_lambda=1e-10, dropout_rate=0.0, use_batch_normalization=False):
     # Regularizers
@@ -87,8 +88,8 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     # Create learning scheduler callback
     lr_scheduler = learningrate.ExponentialDecay(learning_rate, decay_rate)
     
-    if tensorboard_on:
-        print('Tensorboard not supported so far... Add Callback!')
+    #if tensorboard_on:
+        #print('Tensorboard not supported so far... Add Callback!')
         
     # Learning rate callback
     lr_callback = keras.callbacks.LearningRateScheduler(lr_scheduler)
@@ -120,19 +121,19 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     model = keras.models.load_model(checkpoint_dir + '.hdf5')
     
     # Log results
-    if tensorboard_on:
-        print('Logging should be here... Add Callback!')
+    #if tensorboard_on:
+        #print('Logging should be here... Add Callback!')
+        
+    # Compute metrics
+    eval_train, eval_valid, eval_test = get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test,verbose=summary_on, f2_plot=True);
     
     # Compute metrics
-    eval_train = model.evaluate(x=x_train, y=y_train, return_dict=True)
-    eval_valid = model.evaluate(x=x_valid, y=y_valid, return_dict=True)    
-    eval_test = model.evaluate(x=x_test, y=y_test, return_dict=True)
+    #eval_train = model.evaluate(x=x_train, y=y_train, return_dict=True)
+    #eval_valid = model.evaluate(x=x_valid, y=y_valid, return_dict=True)    
+    #eval_test = model.evaluate(x=x_test, y=y_test, return_dict=True)
     
-    auc_train = eval_train['auc']
-    auc_valid = eval_valid['auc']
-    auc_test = eval_test['auc']
-    
-    if summary_on:
-        print(f'[AUC] Train = {auc_train:.4f} - Valid = {auc_valid:.4f} - Test = {auc_test:.4f}')
+    #auc_train = eval_train['auc']
+    #auc_valid = eval_valid['auc']
+    #auc_test = eval_test['auc']
         
-    return auc_train, auc_valid, auc_test
+    return eval_train, eval_valid, eval_test

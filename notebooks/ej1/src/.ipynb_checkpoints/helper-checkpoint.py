@@ -17,7 +17,7 @@ from sklearn.metrics import confusion_matrix, fbeta_score, roc_auc_score
 import datetime
 import matplotlib.pyplot as plt
 
-def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, threshold=0.5, verbose=True):
+def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, threshold=0.5, verbose=True, f2_plot=False):
     """
     Computes the following metrics:
         * AUC
@@ -41,6 +41,7 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
     tn_train, fp_train, fn_train, tp_train = confusion_matrix(y_true=y_train, y_pred=y_train_pred).ravel()
     tn_valid, fp_valid, fn_valid, tp_valid = confusion_matrix(y_true=y_valid, y_pred=y_valid_pred).ravel()
     tn_test, fp_test, fn_test, tp_test = confusion_matrix(y_true=y_test, y_pred=y_test_pred).ravel()
+    
     
     # Define dictionaries to return
     train_dict = {'auc' : 0, 'specificity' : 0, 'sensitivity' : 0, 'ppv' : 0, 'npv' : 0}
@@ -103,10 +104,9 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
     test_dict['specificity'] = specificity_test
     
     if verbose == True:
-        thrld, f2_score, idx = f2_threshold_selection(y_valid_probs, y_valid, y_train_probs, y_train, steps=100, plot=False)
+        thrld, f2_score, idx = f2_threshold_selection(y_valid_probs, y_valid, y_train_probs, y_train, steps=100, plot=f2_plot)
         best_threshold = thrld[idx]
         best_f2 = f2_score[idx]
-        
         print('------------------- Main metric -------------------')
         #print(f'[AUC] Train: {auc_train:.4f} - Valid: {auc_valid:.4f} - Test: {auc_test:.4f}')
         print(f'[AUC] Train: {auc_train_sk:.4f} - Valid: {auc_valid_sk:.4f} - Test: {auc_test_sk:.4f}')
@@ -115,6 +115,10 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
         print(f'[NPV] Train: {npv_train:.4f} - Valid: {npv_valid:.4f} - Test: {npv_test:.4f}')
         print(f'[SEN] Train: {sensitivity_train:.4f} - Valid: {sensitivity_valid:.4f} - Test: {sensitivity_test:.4f}')
         print(f'[SPE] Train: {specificity_train:.4f} - Valid: {specificity_valid:.4f} - Test: {specificity_test:.4f}')
+        print('---------------- Confusion Matrix -----------------')
+        print(f'Train: FP = {fp_train} - TP = {tp_train} - FN = {fn_train} - TN = {tn_train}')
+        print(f'Valid: FP = {fp_valid} - TP = {tp_valid} - FN = {fn_valid} - TN = {tn_valid}')
+        print(f'Test: FP = {fp_test} - TP = {tp_test} - FN = {fn_test} - TN = {tn_test}')
         print(f'--------------- Threshold Selection ---------------')
         print(f'[F2S] Best f2 score for valid is {best_f2:.4f} @ threhsold = {best_threshold:.4f}')
         
