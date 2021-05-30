@@ -94,9 +94,10 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     lr_callback = keras.callbacks.LearningRateScheduler(lr_scheduler)
     
     # Model checkpoint callback
-    mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', monitor='val_auc', save_best_only=True, verbose=0)
+    mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', monitor='val_auc', save_best_only=True, verbose=0, mode='max')
     
     # Tensorboard callback
+    
     if tensorboard_on:
         tb_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, update_freq='epoch')
         
