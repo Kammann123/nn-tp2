@@ -44,18 +44,10 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
     
     
     # Define dictionaries to return
-    train_dict = {'auc' : 0, 'specificity' : 0, 'sensitivity' : 0, 'ppv' : 0, 'npv' : 0}
-    valid_dict = {'auc' : 0, 'specificity' : 0, 'sensitivity' : 0, 'ppv' : 0, 'npv' : 0}
-    test_dict = {'auc' : 0, 'specificity' : 0, 'sensitivity' : 0, 'ppv' : 0, 'npv' : 0}
+    train_dict = {'auc' : 0, 'specificity' : np.nan, 'sensitivity' : np.nan, 'ppv' : np.nan, 'npv' : np.nan}
+    valid_dict = {'auc' : 0, 'specificity' : np.nan, 'sensitivity' : np.nan, 'ppv' : np.nan, 'npv' : np.nan}
+    test_dict = {'auc' : 0, 'specificity' : np.nan, 'sensitivity' : np.nan, 'ppv' : np.nan, 'npv' : np.nan}
     
-    # Calculate AUC (Keras) - slower
-    #eval_train = model.evaluate(x_train, y_train, verbose=0, return_dict=True)
-    #eval_valid = model.evaluate(x_valid, y_valid, verbose=0, return_dict=True)
-    #eval_test = model.evaluate(x_test, y_test, verbose=0, return_dict=True)
-
-    #auc_train = eval_train['auc']
-    #auc_valid= eval_valid['auc']
-    #auc_test = eval_test['auc']
     
     # Calculate AUC (SKLearn) - faster
     auc_train_sk = roc_auc_score(y_true=y_train, y_score=y_train_probs)
@@ -68,37 +60,84 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
 
     
     # Calculate positive predictive value
-    ppv_train = tp_train / (fp_train + tp_train)
-    ppv_valid = tp_valid / (fp_valid + tp_valid)
-    ppv_test = tp_test / (fp_test + tp_test)
-    
-    train_dict['ppv'] = ppv_train
+    if (fp_train + tp_train):
+        ppv_train = tp_train / (fp_train + tp_train)
+    else:
+        ppv_train = np.nan
+        
+    if (fp_valid + tp_valid):
+        ppv_valid = tp_valid / (fp_valid + tp_valid)
+    else:
+        ppv_valid = np.nan
+        
+    if (fp_test + tp_test):
+        ppv_test = tp_test / (fp_test + tp_test)
+    else:
+        ppv_test = np.nan
+        
+    train_dict['ppv'] = ppv_train      
     valid_dict['ppv'] = ppv_valid
     test_dict['ppv'] = ppv_test
     
     # Calculate negative predicitve value
-    npv_train = tn_train / (fn_train + tn_train)
-    npv_valid = tn_valid / (fn_valid + tn_valid)
-    npv_test = tn_test / (fn_test + tn_test)
-    
+    if (fn_train + tn_train):
+        npv_train = tn_train / (fn_train + tn_train)
+    else:
+        npv_train = np.nan
+        
+    if (fn_valid + tn_valid):
+        npv_valid = tn_valid / (fn_valid + tn_valid)
+    else:
+        npv_valid = np.nan
+        
+    if (fn_test + tn_test):
+        npv_test = tn_test / (fn_test + tn_test)
+    else:
+        npv_test = np.nan
+        
     train_dict['npv'] = npv_train
     valid_dict['npv'] = npv_valid
     test_dict['npv'] = npv_test
-    
+
+
     # Calculate sensitivity
-    sensitivity_train = tp_train / (tp_train + fn_train)
-    sensitivity_valid = tp_valid / (tp_valid + fn_valid)
-    sensitivity_test = tp_test / (tp_test + fn_test)
-    
+    if (tp_train + fn_train):
+        sensitivity_train = tp_train / (tp_train + fn_train)
+    else:
+        sensitivity_train = np.nan
+        
+    if (tp_valid + fn_valid):
+        sensitivity_valid = tp_valid / (tp_valid + fn_valid)
+    else:
+        sensitivity_valid = np.nan
+        
+    if (tp_test + fn_test):
+        sensitivity_test = tp_test / (tp_test + fn_test)
+    else:
+        sensitivity_test = np.nan
+        
     train_dict['sensitivity'] = sensitivity_train
     valid_dict['sensitivity'] = sensitivity_valid
     test_dict['sensitivity'] = sensitivity_test
     
+
     # Calculate specificity
-    specificity_train = tn_train / (tn_train + fp_train)
-    specificity_valid = tn_valid / (tn_valid + fp_valid)
-    specificity_test = tn_test / (tn_test + fp_test)
-    
+    if (tn_train + fp_train):
+        specificity_train = tn_train / (tn_train + fp_train)
+    else:
+        specificity_train = np.nan
+        
+    if (tn_valid + fp_valid):
+        specificity_valid = tn_valid / (tn_valid + fp_valid)
+    else:
+        specificity_valid = np.nan
+        
+    if (tn_test + fp_test):
+        specificity_test = tn_test / (tn_test + fp_test)
+    else:
+        specificity_test = np.nan
+        
+ 
     train_dict['specificity'] = specificity_train
     valid_dict['specificity'] = specificity_valid
     test_dict['specificity'] = specificity_test
@@ -108,7 +147,6 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
         best_threshold = thrld[idx]
         best_f2 = f2_score[idx]
         print('------------------- Main metric -------------------')
-        #print(f'[AUC] Train: {auc_train:.4f} - Valid: {auc_valid:.4f} - Test: {auc_test:.4f}')
         print(f'[AUC] Train: {auc_train_sk:.4f} - Valid: {auc_valid_sk:.4f} - Test: {auc_test_sk:.4f}')
         print(f'---------------- Secondary metrics ----------------')
         print(f'[PPV] Train: {ppv_train:.4f} - Valid: {ppv_valid:.4f} - Test: {ppv_test:.4f}')

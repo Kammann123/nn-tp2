@@ -12,6 +12,10 @@ import numpy as np
 import datetime
 from sklearn.metrics import confusion_matrix, fbeta_score, roc_auc_score
 import matplotlib.pyplot as plt
+import pandas as pd
+from src.helper import remove_outliers
+from sklearn import model_selection, preprocessing
+from sklearn.model_selection import KFold
 
 # Project modules of Python
 import src.learningrate as learningrate
@@ -41,10 +45,12 @@ def create_model(input_shape=8, l1=0, l2=0, dropout=0):
         model.add(keras.layers.Dropout(dropout))
         
     return model
-
+        
+    
+    
 def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               learning_rate,
-              tag,
+              tag='untagged',
               degree=1,
               scheduler=None,
               decay_rate=0.1,
@@ -123,9 +129,6 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     else:
         lr_scheduler = lambda epoch: learning_rate
         
-    #if tensorboard_on:
-        #lr_scheduler = helper.LRTensorBoardLogger(log_dir + '/learning-rate', lr_scheduler)
-        #print('uncomment line 123!')
     
     lr_callback = keras.callbacks.LearningRateScheduler(lr_scheduler)
     
@@ -166,14 +169,6 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     # Load the best model and evaluate the metric
     model = keras.models.load_model(checkpoint_dir + '.hdf5')
     
-    # Log results
-    #if tensorboard_on:
-        #helper.tensorboard_log(log_dir + '/train/true', 'charges', y_train.to_numpy().reshape(-1))
-        #helper.tensorboard_log(log_dir + '/train/predicted', 'charges', model.predict(x_train).reshape(-1))
-        #helper.tensorboard_log(log_dir + '/test/true', 'charges', y_test.to_numpy())
-        #helper.tensorboard_log(log_dir + '/test/predicted', 'charges', model.predict(x_test).reshape(-1))
-        #print('uncomment line 166!')
-        
     # Compute metrics
     eval_train = model.evaluate(x_train, y_train, verbose=0, return_dict=True)
     eval_valid = model.evaluate(x_valid, y_valid, verbose=0, return_dict=True)
@@ -197,5 +192,5 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     if summary_on:
         print(f'[AUC] Train: {auc_train:.4f} Valid: {auc_valid:.4f} Test: {auc_test:.4f}')
         
-    return train_scores, valid_scores, test_scores
+    return auc_train, auc_valid, auc_test
     

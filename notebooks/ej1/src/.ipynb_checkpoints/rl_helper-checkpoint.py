@@ -44,7 +44,7 @@ def create_model(input_shape=8, l1=0, l2=0, dropout=0):
 
 def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               learning_rate,
-              tag,
+              tag='untagged',
               degree=1,
               scheduler=None,
               decay_rate=0.1,
@@ -76,6 +76,9 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     checkpoint_dir = 'checkpoints/rl/' + tag + timestamp
     
     # Create the polynomial features preprocessor
+    print(f'Degree = {degree}')
+    sh = x_train.shape
+    print(f'x_train shape = {sh}')
     poly = preprocessing.PolynomialFeatures(degree=degree, include_bias=False)
     poly.fit(x_train)
     x_train = poly.transform(x_train)
@@ -197,5 +200,5 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     if summary_on:
         print(f'[AUC] Train: {auc_train:.4f} Valid: {auc_valid:.4f} Test: {auc_test:.4f}')
         
-    return train_scores, valid_scores, test_scores
+    return auc_train, auc_valid, auc_test
     
