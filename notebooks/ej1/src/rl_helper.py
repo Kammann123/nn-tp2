@@ -48,6 +48,117 @@ def create_model(input_shape=8, l1=0, l2=0, dropout=0):
         
     
     
+def run_model_with_kfold(df,
+                          test_size=0.2,
+                          folds=10,
+                          random_state=5,
+                          *args,
+                          **kwargs
+                         ):
+    
+    
+    # Filtering Glucose values
+    df['Glucose'].replace(0, np.nan, inplace=True)
+
+    # Filtering Blood Pressure values
+    df['BloodPressure'].replace(0, np.nan, inplace=True)
+
+    # Filtering Skin Thickness values
+    df['SkinThickness'].replace(0, np.nan, inplace=True)
+
+    # Filtering Insulin values
+    df['Insulin'].replace(0, np.nan, inplace=True)
+
+    # Filtering Body Mass Index values
+    df['BMI'].replace(0, np.nan, inplace=True)
+    
+    x_labels = ['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction','Age']
+    y_labels = ['Outcome']
+
+    for column in x_labels:
+        remove_outliers(df, column)
+        
+    # Define input and output variables for the model
+    df_x = df[x_labels]
+    df_y = df[y_labels]
+    
+    # Split the dataset into train_valid and test
+    x_train_valid, x_test, y_train_valid, y_test = model_selection.train_test_split(df_x, df_y, test_size=0.2, random_state=random_state, shuffle=True)
+
+    # Compute mean for train-valid subset
+    train_means = x_train_valid.mean().to_numpy()
+
+    # Replacing nan values of the test dataset with training mean values
+    for index, column in enumerate(x_test.columns):
+        x_test.loc[:,column].replace(np.nan, train_means[index], inplace=True)
+        
+    # Init KFold
+    kf = KFold(n_splits=folds, shuffle=True, random_state=random_state)
+    
+    # Create arrays for metrics
+    train_dict = {'auc' : [], 'specificity' : [], 'sensitivity' : [], 'ppv' : [], 'npv' : []}
+    valid_dict = {'auc' : [], 'specificity' : [], 'sensitivity' : [], 'ppv' : [], 'npv' : []}    
+    test_dict = {'auc' : [], 'specificity' : [], 'sensitivity' : [], 'ppv' : [], 'npv' : []}
+    
+    for train_index, valid_index in kf.split(x_train_valid):
+        # Get train and valid splits
+        x_train, y_train = x_train_valid.iloc[train_index], y_train_valid.iloc[train_index]
+        x_valid, y_valid = x_train_valid.iloc[valid_index], y_train_valid.iloc[valid_index]
+        
+        # Compute the mean of training
+        train_means = x_train.mean().to_numpy()
+
+        # Replacing nan values of the train dataset with training mean values
+        for index, column in enumerate(x_train.columns):
+            x_train.loc[:,column].replace(np.nan, train_means[index], inplace=True)
+
+        # Replacing nan values of the test dataset with training mean values
+        for index, column in enumerate(x_valid.columns):
+            x_valid.loc[:,column].replace(np.nan, train_means[index], inplace=True)
+            
+        eval_train, eval_valid, eval_test = run_model(x_train=x_train, y_train=y_train, x_valid=x_valid, y_valid=y_valid, x_test=x_test, y_test=y_test, *args, **kwargs)
+        
+        # Append scores for train, valid and test
+        train_dict['auc'].append(eval_train['auc'])
+        train_dict['specificity'].append(eval_train['specificity'])
+        train_dict['sensitivity'].append(eval_train['sensitivity'])
+        train_dict['ppv'].append(eval_train['ppv'])
+        train_dict['npv'].append(eval_train['npv'])
+
+        valid_dict['auc'].append(eval_valid['auc'])
+        valid_dict['specificity'].append(eval_valid['specificity'])
+        valid_dict['sensitivity'].append(eval_valid['sensitivity'])
+        valid_dict['ppv'].append(eval_valid['ppv'])
+        valid_dict['npv'].append(eval_valid['npv'])
+
+        test_dict['auc'].append(eval_test['auc'])
+        test_dict['specificity'].append(eval_test['specificity'])
+        test_dict['sensitivity'].append(eval_test['sensitivity'])
+        test_dict['ppv'].append(eval_test['ppv'])
+        test_dict['npv'].append(eval_test['npv'])
+        
+    train_dict['auc'] = np.nanmean(train_dict['auc'])
+    train_dict['specificity'] = np.nanmean(train_dict['specificity'])
+    train_dict['sensitivity'] = np.nanmean(train_dict['sensitivity'])
+    train_dict['ppv'] = np.nanmean(train_dict['ppv'])
+    train_dict['npv'] = np.nanmean(train_dict['npv'])
+
+    valid_dict['auc'] = np.nanmean(valid_dict['auc'])
+    valid_dict['specificity'] = np.nanmean(valid_dict['specificity'])
+    valid_dict['sensitivity'] = np.nanmean(valid_dict['sensitivity'])
+    valid_dict['ppv'] = np.nanmean(valid_dict['ppv'])
+    valid_dict['npv'] = np.nanmean(valid_dict['npv'])
+
+    test_dict['auc'] = np.nanmean(test_dict['auc'])
+    test_dict['specificity'] = np.nanmean(test_dict['specificity'])
+    test_dict['sensitivity'] = np.nanmean(test_dict['sensitivity'])
+    test_dict['ppv'] = np.nanmean(test_dict['ppv'])
+    test_dict['npv'] = np.nanmean(test_dict['npv'])
+
+    
+    return train_dict, valid_dict, test_dict
+    
+    
 def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               learning_rate,
               tag='untagged',
@@ -169,28 +280,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     # Load the best model and evaluate the metric
     model = keras.models.load_model(checkpoint_dir + '.hdf5')
     
-    # Compute metrics
-    eval_train = model.evaluate(x_train, y_train, verbose=0, return_dict=True)
-    eval_valid = model.evaluate(x_valid, y_valid, verbose=0, return_dict=True)
-    eval_test = model.evaluate(x_test, y_test, verbose=0, return_dict=True)
-    
-    train_scores = {'auc': 0}
-    valid_scores = {'auc': 0}    
-    test_scores = {'auc': 0}
-    
-
-    auc_train = eval_train['auc']
-    auc_valid= eval_valid['auc']
-    auc_test = eval_test['auc']
-    
-    
-    # Assign metrics
-    train_scores['auc'] = auc_train
-    valid_scores['auc'] = auc_valid
-    test_scores['auc'] = auc_test
-    
-    if summary_on:
-        print(f'[AUC] Train: {auc_train:.4f} Valid: {auc_valid:.4f} Test: {auc_test:.4f}')
+    eval_train, eval_valid, eval_test = helper.get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test,verbose=summary_on, f2_plot=summary_on);
         
-    return auc_train, auc_valid, auc_test
+    return eval_train, eval_valid, eval_test
     

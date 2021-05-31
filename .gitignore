@@ -3,6 +3,12 @@
 /notebooks/ej2/logs/
 /notebooks/ej2/checkpoints/
 /notebooks/ej2/checkpoints/mlp/
+/notebooks/ej1/checkpoints/
+/notebooks/ej1/logs/
+/notebooks/ej1/model_checkpoints/
+/notebooks/ej1/tb-logs/
+/notebooks/ej1/src/__pycache__/
+/notebooks/ej1/src/.ipynb_checkpoints/
 /src/__pycache__
 /src/ipynb_checkpoints
 .ipynb_checkpoints

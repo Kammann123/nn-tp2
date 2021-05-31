@@ -49,6 +49,7 @@ def run_model_with_kfold(df,
                           **kwargs
                          ):
     
+    
     # Filtering Glucose values
     df['Glucose'].replace(0, np.nan, inplace=True)
 
@@ -253,9 +254,8 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     
     # Get best result
     model = keras.models.load_model(checkpoint_dir + '.hdf5')
-    
         
     # Compute metrics
-    eval_train, eval_valid, eval_test = get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test,verbose=summary_on, f2_plot=True);
+    eval_train, eval_valid, eval_test = get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test,verbose=summary_on, f2_plot=summary_on);
         
     return eval_train, eval_valid, eval_test

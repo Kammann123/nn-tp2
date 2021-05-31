@@ -17,7 +17,25 @@ from sklearn.metrics import confusion_matrix, fbeta_score, roc_auc_score
 import datetime
 import matplotlib.pyplot as plt
 
-def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, threshold=0.5, verbose=True, f2_plot=False):
+
+def print_metrics(eval_train, eval_valid, eval_test):
+    auc_train, auc_valid, auc_test = eval_train['auc'], eval_valid['auc'], eval_test['auc']
+    ppv_train, ppv_valid, ppv_test = eval_train['ppv'], eval_valid['ppv'], eval_test['ppv']
+    npv_train, npv_valid, npv_test = eval_train['npv'], eval_valid['npv'], eval_test['npv']
+    npv_train, npv_valid, npv_test = eval_train['npv'], eval_valid['npv'], eval_test['npv'] 
+    sensitivity_train, sensitivity_valid, sensitivity_test = eval_train['sensitivity'], eval_valid['sensitivity'], eval_test['sensitivity']
+    specificity_train, specificity_valid, specificity_test = eval_train['specificity'], eval_valid['specificity'], eval_test['specificity']  
+    
+    print('------------------- Main metric -------------------')
+    print(f'[AUC] Train: {auc_train:.4f} - Valid: {auc_valid:.4f} - Test: {auc_test:.4f}')
+    print(f'---------------- Secondary metrics ----------------')
+    print(f'[PPV] Train: {ppv_train:.4f} - Valid: {ppv_valid:.4f} - Test: {ppv_test:.4f}')
+    print(f'[NPV] Train: {npv_train:.4f} - Valid: {npv_valid:.4f} - Test: {npv_test:.4f}')
+    print(f'[SEN] Train: {sensitivity_train:.4f} - Valid: {sensitivity_valid:.4f} - Test: {sensitivity_test:.4f}')
+    print(f'[SPE] Train: {specificity_train:.4f} - Valid: {specificity_valid:.4f} - Test: {specificity_test:.4f}')
+    return
+    
+def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, threshold=0.5, verbose=True, f2_plot=False, optimize_threshold=True):
     """
     Computes the following metrics:
         * AUC
@@ -32,10 +50,21 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
     y_valid_probs = model.predict(x=x_valid)
     y_test_probs = model.predict(x=x_test)
     
+    # Compute F2 score and get best threshold
+    thrld, f2_score, idx = f2_threshold_selection(y_valid_probs, y_valid, y_train_probs, y_train, steps=100, plot=f2_plot)
+    best_threshold = thrld[idx]
+    best_f2 = f2_score[idx]
+    
+    if optimize_threshold == True:
+        sel_threshold = best_threshold
+    else:
+        sel_threshold = 0.5
+    
+    
     # Round predictions to class
-    y_train_pred = round_threshold(y_train_probs, threshold)
-    y_valid_pred = round_threshold(y_valid_probs, threshold)
-    y_test_pred = round_threshold(y_test_probs, threshold)
+    y_train_pred = round_threshold(y_train_probs, sel_threshold)
+    y_valid_pred = round_threshold(y_valid_probs, sel_threshold)
+    y_test_pred = round_threshold(y_test_probs, sel_threshold)
     
     # Get TP, FP, TN, FN to compute metrics
     tn_train, fp_train, fn_train, tp_train = confusion_matrix(y_true=y_train, y_pred=y_train_pred).ravel()
@@ -143,12 +172,10 @@ def get_metrics(model, x_train, y_train, x_valid, y_valid, x_test, y_test, thres
     test_dict['specificity'] = specificity_test
     
     if verbose == True:
-        thrld, f2_score, idx = f2_threshold_selection(y_valid_probs, y_valid, y_train_probs, y_train, steps=100, plot=f2_plot)
-        best_threshold = thrld[idx]
-        best_f2 = f2_score[idx]
         print('------------------- Main metric -------------------')
         print(f'[AUC] Train: {auc_train_sk:.4f} - Valid: {auc_valid_sk:.4f} - Test: {auc_test_sk:.4f}')
         print(f'---------------- Secondary metrics ----------------')
+        print(f'Using threshold = {sel_threshold:.4f}')
         print(f'[PPV] Train: {ppv_train:.4f} - Valid: {ppv_valid:.4f} - Test: {ppv_test:.4f}')
         print(f'[NPV] Train: {npv_train:.4f} - Valid: {npv_valid:.4f} - Test: {npv_test:.4f}')
         print(f'[SEN] Train: {sensitivity_train:.4f} - Valid: {sensitivity_valid:.4f} - Test: {sensitivity_test:.4f}')
@@ -216,17 +243,46 @@ def f2_threshold_selection(y_probs_valid, y_true_valid, y_probs_train, y_true_tr
     
     idx = np.argmax(f2_score_valid)
     if plot == True:
-        plt.plot(thresholds, f2_score_valid, label='valid')
-        plt.plot(thresholds, f2_score_train, label='train')
-        plt.xlabel('Threshold')
-        plt.ylabel('F2 score')
-        plt.axvline(thresholds[idx], color='black', linestyle='--')
-        plt.xlim([0,1])
-        plt.ylim([0,1])
-        plt.grid(b=True)
-        plt.title('Selecting best threshold')
-        plt.legend()
+        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(30,8))
+        
+        # PLotting F2 score vs threshold
+        ax[0].plot(thresholds, f2_score_valid, label='valid')
+        ax[0].plot(thresholds, f2_score_train, label='train')
+        ax[0].set_xlabel('Threshold')
+        ax[0].set_ylabel('F2 score')
+        ax[0].axvline(thresholds[idx], color='black', linestyle='--')
+        ax[0].set_xlim([0,1])
+        ax[0].set_ylim([0,1])
+        ax[0].grid(b=True)
+        ax[0].set_title('Selecting best threshold')
+        ax[0].legend()
+        
+        # PLotting output histogram for valid
+        ax[1].hist(y_probs_train[y_true_train == 1], alpha=0.5, label='positive', bins=24)
+        ax[1].hist(y_probs_train[y_true_train == 0], alpha=0.5, label='negative', bins=24)
+        ax[1].set_xlabel('Probability')
+        ax[1].set_ylabel('Frequency')
+        ax[1].axvline(thresholds[idx], color='black', linestyle='--')
+        ax[1].set_xlim([0,1])
+        ax[1].grid(b=True)
+        ax[1].set_title('Class distribution for train')
+        ax[1].legend()
+        
+        # PLotting output histogram for valid
+        ax[2].hist(y_probs_valid[y_true_valid == 1], alpha=0.5, label='positive', bins=24)
+        ax[2].hist(y_probs_valid[y_true_valid == 0], alpha=0.5, label='negative', bins=24)
+        ax[2].set_xlabel('Probability')
+        ax[2].set_ylabel('Frequency')
+        ax[2].axvline(thresholds[idx], color='black', linestyle='--')
+        ax[2].set_xlim([0,1])
+        ax[2].grid(b=True)
+        ax[2].set_title('Class distribution for valid')
+        ax[2].legend()
+        
+        
         plt.show()
+        
+        
         
     return thresholds, f2_score_valid, idx
 
