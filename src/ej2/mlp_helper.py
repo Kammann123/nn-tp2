@@ -5,8 +5,11 @@
 """
 
 # Third-party modules of Python
+from sklearn import model_selection
+from sklearn import preprocessing
 import tensorflow.keras as keras
 import tensorflow as tf
+import numpy as np
 import datetime
 
 # Project modules of Python
@@ -139,7 +142,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param verbose                   Passes the verbose to the .fit() routine from the Keras framework
         @param tag                       Tag name used to identify in the logs and checkpoints
         @param *args, **kwargs           Parameters passed to the model
-        @return Mean absolute error in the given test set
+        @return MAE measured in train, valid and test (mae_train, mae_valid, mae_test)
     """
     # Get current timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -244,3 +247,60 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     if summary_on:
         print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
     return mae_train, mae_valid, mae_test
+
+
+def run_model_with_kfold(x, y, test_size, n_splits, random_state=10, *args, **kwargs):
+    """ Run model using K-Fold validation method to improve metric estimation.
+        @param x, y               Dataset
+        @param test_size          Relative size of the dataset to be used for test
+        @param n_splits           Number of slipts for the k-fold validation method
+        @param *args, **kargs     Parameters used for the model
+        @return MAE measured in train, valid and test (mae_train, mae_valid, mae_test)
+    """
+    
+    # Split the dataset into train_valid and test
+    x_train_valid, x_test, y_train_valid, y_test = model_selection.train_test_split(x, y, test_size=test_size, random_state=random_state, shuffle=True)
+    
+    # Apply the z-score to the test set and re-arange for a suitable order of variables
+    scalable_variables = ['bmi', 'age']
+    if scalable_variables:
+        scaler = preprocessing.StandardScaler()
+        scaler.fit(x_train_valid.loc[:, scalable_variables])
+        x_test.loc[:, scalable_variables] = scaler.transform(x_test.loc[:, scalable_variables])
+    x_test = [x_test[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_test['region-encoded']]
+    
+    # Create an instance of a K-Folding handler
+    kf = model_selection.KFold(n_splits=n_splits, random_state=random_state, shuffle=True)
+
+    # Generate arrays to contain train, valid and test metrics
+    train_metrics = np.zeros(n_splits)
+    valid_metrics = np.zeros(n_splits)
+    test_metrics = np.zeros(n_splits)
+
+    # Iterate through each fold
+    for i, (train, valid) in enumerate(kf.split(x_train_valid, y_train_valid)):
+
+        # Create a copy of the train and valid sets used for the current fold or iteration
+        x_train = x_train_valid.iloc[train].copy()
+        y_train = y_train_valid.iloc[train].copy()
+        x_valid = x_train_valid.iloc[valid].copy()
+        y_valid = y_train_valid.iloc[valid].copy()
+
+        # Apply the z-score to normalize both the train and valid sets, and re-arange features
+        scalable_variables = ['bmi', 'age']
+        if scalable_variables:
+            scaler = preprocessing.StandardScaler()
+            scaler.fit(x_train.loc[:, scalable_variables])
+            x_train.loc[:, scalable_variables] = scaler.transform(x_train.loc[:, scalable_variables])
+            x_valid.loc[:, scalable_variables] = scaler.transform(x_valid.loc[:, scalable_variables])
+        x_train = [x_train[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_train['region-encoded']]
+        x_valid = [x_valid[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_valid['region-encoded']]
+
+        # Run model and save metrics
+        mae_train, mae_valid, mae_test = run_model(x_train, y_train, x_valid, y_valid, x_test, y_test, *args, **kwargs)
+        train_metrics[i] = mae_train
+        valid_metrics[i] = mae_valid
+        test_metrics[i] = mae_test
+    
+    # Return results
+    return train_metrics, valid_metrics, test_metrics

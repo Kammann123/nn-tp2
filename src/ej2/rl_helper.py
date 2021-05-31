@@ -103,7 +103,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param summary_on                Enables whether to print a summary of the model and its results
         @param verbose                   Passes the verbose to the .fit() routine from the Keras framework
         @param tag                       Tag name used to identify in the logs and checkpoints
-        @return Mean absolute error in the given test set
+        @return MAE measured in train, valid and test (mae_train, mae_valid, mae_test)
     """
     # Get current timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
