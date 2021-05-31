@@ -7,7 +7,35 @@
 # Third-party modules of Python
 import tensorflow.keras as keras
 import tensorflow as tf
+import numpy as np
 import datetime
+
+
+def get_outliers(data, var):
+    """ Get the outliers of the DataFrame column
+        @param data Pandas DataFrame
+        @param var  Name of the column of the DataFrame to extract outliers
+        @return Array of outliers
+    """
+    q1 = data[var].quantile(0.25)
+    q3 = data[var].quantile(0.75)
+    iqr = q3 - q1
+    mean = data[var].mean()
+    ret = []
+    for value in data[var]:
+        if value < (q1 - 1.5 * iqr) or value > (q3 + 1.5 * iqr):
+            ret.append(value)
+    return ret
+
+
+def remove_outliers(data, var): 
+    """ Remove outliers from the DataFrame colum
+        @param data Pandas DataFrame
+        @param var  Name of the column of the DataFrame to extract outliers
+    """
+    outliers = get_outliers(data, var)
+    for outlier in outliers:
+        data[var].replace(outlier, np.nan, inplace=True)
 
 
 class LRTensorBoardLogger:

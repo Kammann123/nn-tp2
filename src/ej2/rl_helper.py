@@ -5,6 +5,7 @@
 """
 
 # Third-party modules of Python
+import sklearn.compose as compose
 import sklearn.preprocessing as preprocessing
 import tensorflow.keras as keras
 import tensorflow as tf
@@ -18,12 +19,17 @@ import src.helper as helper
 
 def create_model(input_shape=1,
                  regularizer=None,
-                 regularizer_lambda=1e-10):
+                 regularizer_lambda=1e-10,
+                 bias_initializer='zeros',
+                 kernel_initializer='random_normal'
+                ):
     """ Creates a linear regression model using the given hyperparameters.
     
         @param input_shape               Amount of input variables of the model
         @param regularizer               Type of regularizer to use, values supported are None, 'l1' or 'l2'
-        @param regularizer_lambda        Regularizer coefficiente
+        @param regularizer_lambda        Regularizer coefficient
+        @param bias_initializer          Initializer for bias weights
+        @param kernel_initializer        Initializer of synaptic weights
         @return Keras model instance
     """
     # If a regularizer is set, create it before creating the model
@@ -38,8 +44,9 @@ def create_model(input_shape=1,
     model = keras.Sequential()
     model.add(keras.layers.Input(shape=(input_shape, )))
     model.add(keras.layers.Dense(units=1, 
-                                 activation='linear', 
-                                 kernel_initializer='random_normal',
+                                 activation='linear',
+                                 bias_initializer=bias_initializer,
+                                 kernel_initializer=kernel_initializer,
                                  kernel_regularizer=kernel_regularizer
                                 ))
     return model
@@ -52,6 +59,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               decay_rate=0.1,
               drop_rate=0.5,
               epochs_drop=10,
+              loss='mae',
               optimizer='sgd',
               momentum=0,
               rho=0,
@@ -64,6 +72,8 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               tensorboard_on=True,
               checkpoints_on=True,
               summary_on=True,
+              verbose=0,
+              tag='experiment',
               *args,
               **kwargs):
     """ Creates the model using the given hyperparameters, compiles the model and run the train, 
@@ -78,6 +88,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param decay_rate                Decaying rate of the learning rate, when using TimeBasedDecay or ExponentialDecay
         @param drop_rate                 Drop rate of the learning rate, when using StepDecay
         @param epochs_drop               Period of epochs for learning rate update, when using StepDecay
+        @param loss                      Loss function to be used
         @param optimizer                 Optimizer
         @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0
         @param rho                       Factor used with the second order momentum, belongs to [0, 1]. Default is 0
@@ -90,16 +101,18 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param tensorboard_on            Enables whether to log or not onto TensorBoard
         @param checkpoints_on            Enables whether to save model checkpoints or not
         @param summary_on                Enables whether to print a summary of the model and its results
+        @param verbose                   Passes the verbose to the .fit() routine from the Keras framework
+        @param tag                       Tag name used to identify in the logs and checkpoints
         @return Mean absolute error in the given test set
     """
     # Get current timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     
     # Create the logging directory name
-    log_dir = 'tb-logs/rl/' + timestamp
+    log_dir = f'tb-logs/rl/{tag}/{timestamp}'
     
     # Create the model checkpoint directory name
-    checkpoint_dir = 'checkpoints/rl/' + timestamp
+    checkpoint_dir = f'checkpoints/rl/{tag}/{timestamp}'
     
     # Create the polynomial features preprocessor
     poly = preprocessing.PolynomialFeatures(degree=degree, include_bias=False)
@@ -135,7 +148,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     
     # Compile the model
     model.compile(optimizer=model_optimizer,
-                  loss=keras.losses.MAE,
+                  loss=loss,
                   metrics=[ keras.losses.MAE ]
                  )
     
@@ -156,7 +169,12 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     
     # Create the model checkpoint callback
     if checkpoints_on:
-        mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', monitor='val_loss', save_best_only=True, verbose=0)
+        mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', 
+                                                      monitor='val_loss', 
+                                                      save_best_only=True, 
+                                                      verbose=0,
+                                                      mode='min'
+                                                     )
     
     # Create the tensorboard callback
     if tensorboard_on:
@@ -184,7 +202,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     model.fit(x_train, y_train,
               validation_data=(x_valid, y_valid),
               epochs=epochs, 
-              verbose=0, 
+              verbose=verbose, 
               shuffle=True, 
               batch_size=batch_size,
               callbacks=callbacks,
@@ -205,6 +223,12 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     mae_train, _ = model.evaluate(x_train, y_train, verbose=0)
     mae_valid, _ = model.evaluate(x_valid, y_valid, verbose=0)
     mae_test, _ = model.evaluate(x_test, y_test, verbose=0)
+    
+    # Round values
+    mae_train = round(mae_train, 2)
+    mae_valid = round(mae_valid, 2)
+    mae_test = round(mae_test, 2)
+    
     if summary_on:
         print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
     return mae_train, mae_valid, mae_test

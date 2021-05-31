@@ -18,7 +18,9 @@ def create_model(hidden_layers=0,
                  units_per_layer=0,
                  hidden_layer_activation=None,
                  regularizer=None,
-                 regularizer_lambda=1e-10,
+                 regularizer_lambda=1e-4,
+                 bias_initializer='zeros',
+                 kernel_initializer='random_normal',
                  dropout_rate=0.0,
                  use_batch_normalization=False
                 ):
@@ -30,7 +32,9 @@ def create_model(hidden_layers=0,
         @param units_per_layer           Units or neurons per layer
         @param hidden_layer_activation   Activation function used in hidden layers
         @param regularizer               Type of regularizer to use, values supported are None, 'l1' or 'l2'
-        @param regularizer_lambda        Regularizer coefficiente
+        @param regularizer_lambda        Regularizer coefficient
+        @param bias_initializer          Initializer for bias weights
+        @param kernel_initializer        Initializer of synaptic weights
         @param dropout_rate              Rate of the dropout layer added after each dense layer
         @param use_batch_normalization   Determines whether to use Batch Normalization between hidden layers or not
         @return Keras neural network or model instance
@@ -63,7 +67,8 @@ def create_model(hidden_layers=0,
         previous_layer = layers[layers_per_layer * layer_index - 1] if layer_index else x
         current_layer = keras.layers.Dense(units=units_per_layer, 
                                            activation=hidden_layer_activation, 
-                                           kernel_initializer='random_normal',
+                                           kernel_initializer=kernel_initializer,
+                                           bias_initializer=bias_initializer,
                                            kernel_regularizer=kernel_regularizer
                                           )(previous_layer)
         layers.append(current_layer)
@@ -106,6 +111,8 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
               min_delta=10,
               tensorboard_on=True,
               summary_on=True,
+              verbose=0,
+              tag='experiment',
               *args,
               **kwargs
              ):
@@ -129,6 +136,8 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
         @param min_delta                 Minimum delta accounted as an improvement in the loss function during training
         @param tensorboard_on            Enables whether to log or not onto TensorBoard
         @param summary_on                Enables whether to print a summary of the model and its results
+        @param verbose                   Passes the verbose to the .fit() routine from the Keras framework
+        @param tag                       Tag name used to identify in the logs and checkpoints
         @param *args, **kwargs           Parameters passed to the model
         @return Mean absolute error in the given test set
     """
@@ -136,10 +145,10 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     
     # Create the logging directory name
-    log_dir = 'tb-logs/mlp/' + timestamp
+    log_dir = f'tb-logs/mlp/{tag}/{timestamp}'
     
     # Create the model checkpoint directory name
-    checkpoint_dir = 'checkpoints/mlp/' + timestamp
+    checkpoint_dir = f'checkpoints/mlp/{tag}/{timestamp}'
     
     # Create the neural network
     model = create_model(*args, **kwargs)
@@ -174,7 +183,12 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     lr_callback = keras.callbacks.LearningRateScheduler(lr_scheduler)
     
     # Create the model checkpoint callback
-    mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5', monitor='val_loss', save_best_only=True, verbose=0)
+    mc_callback = keras.callbacks.ModelCheckpoint(checkpoint_dir + '.hdf5',
+                                                  monitor='val_loss',
+                                                  save_best_only=True,
+                                                  verbose=0,
+                                                  mode='min'
+                                                 )
     
     # Create the tensorboard callback
     if tensorboard_on:
@@ -200,7 +214,7 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     model.fit(x_train, y_train,
               validation_data=(x_valid, y_valid),
               epochs=epochs, 
-              verbose=0, 
+              verbose=verbose, 
               shuffle=True, 
               batch_size=batch_size,
               callbacks=callbacks,
@@ -221,6 +235,12 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     mae_train, _ = model.evaluate(x_train, y_train, verbose=0)
     mae_valid, _ = model.evaluate(x_valid, y_valid, verbose=0)
     mae_test, _ = model.evaluate(x_test, y_test, verbose=0)
+    
+    # Round values
+    mae_train = round(mae_train, 2)
+    mae_valid = round(mae_valid, 2)
+    mae_test = round(mae_test, 2)
+    
     if summary_on:
         print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
     return mae_train, mae_valid, mae_test
