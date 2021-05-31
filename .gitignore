@@ -9,7 +9,9 @@
 /notebooks/ej1/tb-logs/
 /notebooks/ej1/src/__pycache__/
 /notebooks/ej1/src/.ipynb_checkpoints/
+/notebooks/ej2/ipynb_checkpoints
 /src/__pycache__
 /src/ipynb_checkpoints
 .ipynb_checkpoints
 __pycache__
+.ipynb_checkpoints/

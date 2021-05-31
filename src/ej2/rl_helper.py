@@ -5,6 +5,8 @@
 """
 
 # Third-party modules of Python
+from sklearn import model_selection
+from sklearn import preprocessing
 import sklearn.compose as compose
 import sklearn.preprocessing as preprocessing
 import tensorflow.keras as keras
@@ -79,30 +81,30 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     """ Creates the model using the given hyperparameters, compiles the model and run the train, 
         validation and test process.
         
-        @param x_train, y_train          Train set
-        @param x_valid, y_valid          Valid set
-        @param x_test, y_test            Test set
-        @param learning_rate             Learning rate
-        @param degree                    Order of the polynomial features
-        @param scheduler                 Type of learning rate used, can be None (constant learning rate), 'exponential-decay', 'step-decay' or 'time-decay'
-        @param decay_rate                Decaying rate of the learning rate, when using TimeBasedDecay or ExponentialDecay
-        @param drop_rate                 Drop rate of the learning rate, when using StepDecay
-        @param epochs_drop               Period of epochs for learning rate update, when using StepDecay
-        @param loss                      Loss function to be used
-        @param optimizer                 Optimizer
-        @param momentum                  Factor used with the first order momentum, belongs to [0, 1]. Default is 0
-        @param rho                       Factor used with the second order momentum, belongs to [0, 1]. Default is 0
-        @param beta_1                    Factor used with the first order momentum, belongs to [0, 1]. Default is 0
-        @param beta_2                    Factor used with the second order momentum, belongs to [0, 1]. Default is 0
-        @param batch_size                Batch size
-        @param epochs                    Amount of epochs
-        @param patience                  Patience used for early stopping, amount of epochs without improvements allowed
-        @param min_delta                 Minimum delta accounted as an improvement in the loss function during training
-        @param tensorboard_on            Enables whether to log or not onto TensorBoard
-        @param checkpoints_on            Enables whether to save model checkpoints or not
-        @param summary_on                Enables whether to print a summary of the model and its results
-        @param verbose                   Passes the verbose to the .fit() routine from the Keras framework
-        @param tag                       Tag name used to identify in the logs and checkpoints
+        @param x_train, y_train       Train set
+        @param x_valid, y_valid       Valid set
+        @param x_test, y_test         Test set
+        @param learning_rate          Learning rate
+        @param degree                 Order of the polynomial features
+        @param scheduler              Type of learning rate used, can be None (constant learning rate), 'exponential-decay', 'step-decay' or 'time-decay'
+        @param decay_rate             Decaying rate of the learning rate, when using TimeBasedDecay or ExponentialDecay
+        @param drop_rate              Drop rate of the learning rate, when using StepDecay
+        @param epochs_drop            Period of epochs for learning rate update, when using StepDecay
+        @param loss                   Loss function to be used
+        @param optimizer              Optimizer
+        @param momentum               Factor used with the first order momentum, belongs to [0, 1]. Default is 0
+        @param rho                    Factor used with the second order momentum, belongs to [0, 1]. Default is 0
+        @param beta_1                 Factor used with the first order momentum, belongs to [0, 1]. Default is 0
+        @param beta_2                 Factor used with the second order momentum, belongs to [0, 1]. Default is 0
+        @param batch_size             Batch size
+        @param epochs                 Amount of epochs
+        @param patience               Patience used for early stopping, amount of epochs without improvements allowed
+        @param min_delta              Minimum delta accounted as an improvement in the loss function during training
+        @param tensorboard_on         Enables whether to log or not onto TensorBoard
+        @param checkpoints_on         Enables whether to save model checkpoints or not
+        @param summary_on             Enables whether to print a summary of the model and its results
+        @param verbose                Passes the verbose to the .fit() routine from the Keras framework
+        @param tag                    Tag name used to identify in the logs and checkpoints
         @return MAE measured in train, valid and test (mae_train, mae_valid, mae_test)
     """
     # Get current timestamp
@@ -232,3 +234,42 @@ def run_model(x_train, y_train, x_valid, y_valid, x_test, y_test,
     if summary_on:
         print(f'[MAE] Train: {mae_train} Valid: {mae_valid} Test: {mae_test}')
     return mae_train, mae_valid, mae_test
+
+
+def run_model_with_kfold(x, y, test_size, n_splits, random_state=10, *args, **kwargs):
+    """ Run model using K-Fold validation method to improve metric estimation.
+        @param x, y               Dataset
+        @param test_size          Relative size of the dataset to be used for test
+        @param n_splits           Number of slipts for the k-fold validation method
+        @param *args, **kargs     Parameters used for the model
+        @return MAE measured in train, valid and test (mae_train, mae_valid, mae_test)
+    """
+    
+    # Split the dataset into train_valid and test
+    x_train_valid, x_test, y_train_valid, y_test = model_selection.train_test_split(x, y, test_size=test_size, random_state=random_state, shuffle=True)
+    
+    # Create an instance of a K-Folding handler
+    kf = model_selection.KFold(n_splits=n_splits, random_state=random_state, shuffle=True)
+
+    # Generate arrays to contain train, valid and test metrics
+    train_metrics = np.zeros(n_splits)
+    valid_metrics = np.zeros(n_splits)
+    test_metrics = np.zeros(n_splits)
+
+    # Iterate through each fold
+    for i, (train, valid) in enumerate(kf.split(x_train_valid, y_train_valid)):
+
+        # Create a copy of the train and valid sets used for the current fold or iteration
+        x_train = x_train_valid.iloc[train].copy()
+        y_train = y_train_valid.iloc[train].copy()
+        x_valid = x_train_valid.iloc[valid].copy()
+        y_valid = y_train_valid.iloc[valid].copy()
+
+        # Run model and save metrics
+        mae_train, mae_valid, mae_test = run_model(x_train, y_train, x_valid, y_valid, x_test, y_test, *args, **kwargs)
+        train_metrics[i] = mae_train
+        valid_metrics[i] = mae_valid
+        test_metrics[i] = mae_test
+    
+    # Return results
+    return train_metrics, valid_metrics, test_metrics

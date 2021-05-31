@@ -5,10 +5,37 @@
 """
 
 # Third-party modules of Python
+import matplotlib.pyplot as plt
 import tensorflow.keras as keras
 import tensorflow as tf
 import numpy as np
 import datetime
+
+
+def plot_kfold_metrics(train_maes, valid_maes, test_maes):
+    """ Plot the performance of the model in each iteration in the train, valid and test sets.
+        @param train_maes Metrics for each iteration in the train set
+        @param valid_maes Metrics for each iteration in the valid set
+        @param test_maes  Metrics for each iteration in the test set
+    """
+    # Create the plots
+    plt.subplots(1, 1, figsize=(15, 8))
+    
+    # Create the k variable
+    k = np.linspace(1, len(train_maes), len(train_maes))
+    
+    # Plot metrics in the train, valid and test sets
+    plt.plot(k, train_maes, label='Train metric', color='blue', marker='o')
+    plt.plot(k, valid_maes, label='Valid metric', color='red', marker='o')
+    plt.plot(k, test_maes, label='Test metric', color='green', marker='o')
+    
+    # Add information and format the plot
+    plt.title(f'K-Folding Validation (K={len(train_maes)})', fontsize=15)
+    plt.xlabel('Iteration', fontsize=12)
+    plt.ylabel('MAE', fontsize=12)
+    plt.legend()
+    plt.grid()
+    plt.show()
 
 
 def get_outliers(data, var):
