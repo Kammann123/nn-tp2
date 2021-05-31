@@ -259,15 +259,15 @@ def run_model_with_kfold(x, y, test_size, n_splits, random_state=10, *args, **kw
     """
     
     # Split the dataset into train_valid and test
-    x_train_valid, x_test, y_train_valid, y_test = model_selection.train_test_split(x, y, test_size=test_size, random_state=random_state, shuffle=True)
+    x_train_valid, x_test_un, y_train_valid, y_test_un = model_selection.train_test_split(x, y, test_size=test_size, random_state=random_state, shuffle=True)
     
     # Apply the z-score to the test set and re-arange for a suitable order of variables
-    scalable_variables = ['bmi', 'age']
-    if scalable_variables:
-        scaler = preprocessing.StandardScaler()
-        scaler.fit(x_train_valid.loc[:, scalable_variables])
-        x_test.loc[:, scalable_variables] = scaler.transform(x_test.loc[:, scalable_variables])
-    x_test = [x_test[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_test['region-encoded']]
+    # scalable_variables = ['bmi', 'age']
+    # if scalable_variables:
+    #    scaler = preprocessing.StandardScaler()
+    #    scaler.fit(x_train_valid.loc[:, scalable_variables])
+    #    x_test.loc[:, scalable_variables] = scaler.transform(x_test.loc[:, scalable_variables])
+    #x_test = [x_test[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_test['region-encoded']]
     
     # Create an instance of a K-Folding handler
     kf = model_selection.KFold(n_splits=n_splits, random_state=random_state, shuffle=True)
@@ -285,6 +285,8 @@ def run_model_with_kfold(x, y, test_size, n_splits, random_state=10, *args, **kw
         y_train = y_train_valid.iloc[train].copy()
         x_valid = x_train_valid.iloc[valid].copy()
         y_valid = y_train_valid.iloc[valid].copy()
+        x_test = x_test_un.copy()
+        y_test = y_test_un.copy()
 
         # Apply the z-score to normalize both the train and valid sets, and re-arange features
         scalable_variables = ['bmi', 'age']
@@ -293,8 +295,10 @@ def run_model_with_kfold(x, y, test_size, n_splits, random_state=10, *args, **kw
             scaler.fit(x_train.loc[:, scalable_variables])
             x_train.loc[:, scalable_variables] = scaler.transform(x_train.loc[:, scalable_variables])
             x_valid.loc[:, scalable_variables] = scaler.transform(x_valid.loc[:, scalable_variables])
+            x_test.loc[:, scalable_variables] = scaler.transform(x_test.loc[:, scalable_variables])
         x_train = [x_train[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_train['region-encoded']]
         x_valid = [x_valid[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_valid['region-encoded']]
+        x_test = [x_test[['age', 'bmi', 'smoker-encoded', 'children', 'sex-encoded']], x_test['region-encoded']]
 
         # Run model and save metrics
         mae_train, mae_valid, mae_test = run_model(x_train, y_train, x_valid, y_valid, x_test, y_test, *args, **kwargs)
